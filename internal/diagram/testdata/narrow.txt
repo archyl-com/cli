@@ -1,0 +1,14 @@
+▣ Storefront  web app · React
+  → Shop API  places orders ×2
+▣ Shop API  api · Go
+  → Orders DB  reads from ×2
+  → Stripe  charges cards
+▣ Fulfilment Worker  worker · Go
+  → Orders DB  reads from
+  → Warehouse  ships orders
+  → Mailgun  sends receipts
+▣ Orders DB  database · PostgreSQL
+◆ Stripe  software system · external
+◆ Warehouse  software system · external
+  → Shop API  updates stock
+◆ Mailgun  software system · external

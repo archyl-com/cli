@@ -1,0 +1,65 @@
+version: 2
+
+project_name: archyl
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/archyl
+    binary: archyl
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X github.com/archyl-com/cli/internal/buildinfo.Version={{.Version}}
+      - -X github.com/archyl-com/cli/internal/buildinfo.Commit={{.ShortCommit}}
+
+archives:
+  # install.sh and action.yml depend on this name.
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [LICENSE, README.md]
+
+checksum:
+  name_template: checksums.txt
+
+# Keyless signing through GitHub OIDC; verify with cosign verify-blob.
+signs:
+  - cmd: cosign
+    certificate: "${artifact}.pem"
+    args: ["sign-blob", "--output-certificate=${certificate}", "--output-signature=${signature}", "${artifact}", "--yes"]
+    artifacts: checksum
+
+sboms:
+  - artifacts: archive
+
+release:
+  prerelease: auto
+
+brews:
+  - repository:
+      owner: archyl-com
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://archyl.com
+    description: Your architecture, in the terminal and in your coding agents
+    license: MIT
+    skip_upload: auto
+    test: |
+      system "#{bin}/archyl", "--version"
+    install: |
+      bin.install "archyl"
+      generate_completions_from_executable(bin/"archyl", "completion")
+
+changelog:
+  use: github
+  filters:
+    exclude: ["^docs:", "^test:", "^chore:"]

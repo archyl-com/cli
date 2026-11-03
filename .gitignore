@@ -1,0 +1,6 @@
+/archyl
+/bin/
+/dist/
+*.test
+coverage.out
+/.e2e/

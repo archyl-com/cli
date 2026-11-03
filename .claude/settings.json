@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "archyl guard",
+            "timeout": 20,
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      }
+    ]
+  },
+  "statusLine": {
+    "command": "archyl statusline",
+    "type": "command"
+  }
+}

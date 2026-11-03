@@ -1,0 +1,29 @@
+
+                                ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐
+                                ╎ ▣ Storefront    ╎
+                                ╎ web app · React ╎
+                                └╌╌╌╌╌┬╌╌╌╌╌┬╌╌╌╌╌┘
+                                      │     │ browses products
+                                 ┌────┘     └─────┐
+                                 │ places orders  │
+                                 ▼                ▼
+                          ┌────────────┐   ┌────────────┐
+                          │ ◉ Checkout │   │ ◉ Catalog  │
+                          │ service    │   │ service    │
+                          └───┬────┬───┘   └──────┬─────┘
+                              │    │              │
+              ┌───────────────┘    │ uses         └────┐
+              │ uses               │                   │
+              ▼                    ▼        reads from │
+ ┏━━━━━━━━━━━━━━━━━━━━━━━━┓   ┌────────────────────┐   │
+ ┃ ◉ Payments Client  1 ƒ ┃   │ ◉ Order Repository │   │
+ ┃ client                 ┃   │ repository         │   │
+ ┗━━━━━━━━━━━━━┯━━━━━━━━━━┛   └──────────────┬─────┘   │
+               │                             │         │
+               │ charges cards     writes to │       ┌─┘
+               │                             │       │
+               ▼                             ▼       ▼
+      ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐            ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐
+      ╎ ◆ Stripe        ╎            ╎ ▣ Orders DB           ╎
+      ╎ software system ╎            ╎ database · PostgreSQL ╎
+      └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘            └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘

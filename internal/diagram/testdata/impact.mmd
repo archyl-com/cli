@@ -1,0 +1,24 @@
+flowchart TB
+  classDef touched fill:#eef2ff,stroke:#4f46e5,stroke-width:3px,color:#18181b
+  classDef impacted fill:#f5f5ff,stroke:#818cf8,stroke-width:2px,color:#18181b
+  classDef distant fill:#fafafa,stroke:#a5b4fc,color:#52525b,stroke-dasharray:4 3
+  classDef muted fill:#fafafa,stroke:#d4d4d8,color:#a1a1aa
+  n1["<b>Checkout</b><br/>service"]
+  n2["<b>Catalog</b><br/>service"]
+  n3["<b>Payments Client</b><br/>client"]
+  n4["<b>Order Repository</b><br/>repository"]
+  n5["<b>Storefront</b><br/>web app · React"]
+  n6[("<b>Orders DB</b><br/>database · PostgreSQL")]
+  n7["<b>Stripe</b><br/>software system"]
+  n5 -->|"places orders"| n1
+  n5 -->|"browses products"| n2
+  n1 -->|"uses"| n3
+  n1 -->|"uses"| n4
+  n2 -->|"reads from"| n6
+  n3 -->|"charges cards"| n7
+  n4 -->|"writes to"| n6
+  class n1 impacted
+  class n2,n4,n6,n7 muted
+  class n3 touched
+  class n5 distant
+  linkStyle 2 stroke:#4f46e5,stroke-width:2px

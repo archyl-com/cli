@@ -1,0 +1,13 @@
+
+                       ┌─────────────────┐
+                       │ ◆ Shop      4 ▣ │
+                       │ software system │
+                       └───┬────┬────────┘
+                           │    │    ▲
+          ┌────────────────┘    │    └────────────────┐
+          │ charges cards       │        ships orders │
+          ▼                     ▼ sends receipts      ▼
+ ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐   ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐   ┌─────────────────┐
+ ╎ ◆ Stripe        ╎   ╎ ◆ Mailgun       ╎   │ ◆ Warehouse     │
+ ╎ software system ╎   ╎ software system ╎   │ software system │
+ └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘   └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘   └─────────────────┘
