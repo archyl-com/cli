@@ -49,6 +49,7 @@ brews:
       owner: archyl-com
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
     homepage: https://archyl.com
     description: Your architecture, in the terminal and in your coding agents
     license: MIT
