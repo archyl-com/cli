@@ -1,0 +1,59 @@
+name: Archyl
+description: Install the archyl CLI and, optionally, run it — architecture checks, impact and reviews on every pull request.
+author: Archyl
+branding:
+  icon: layers
+  color: purple
+
+inputs:
+  version:
+    description: archyl version to install (default latest)
+    required: false
+    default: ""
+  command:
+    description: archyl command to run after installing, e.g. "review --comment" or "check"; leave empty to only install
+    required: false
+    default: ""
+  api-key:
+    description: Archyl API key (store it as a secret)
+    required: false
+    default: ""
+  project-id:
+    description: Archyl project ID; defaults to the repository's .archyl.json
+    required: false
+    default: ""
+  host:
+    description: Archyl API URL for self-hosted instances
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install archyl
+      shell: bash
+      env:
+        ARCHYL_VERSION: ${{ inputs.version }}
+        INSTALL_DIR: ${{ runner.temp }}/archyl-bin
+      run: |
+        sh "${{ github.action_path }}/install.sh"
+        echo "$INSTALL_DIR" >> "$GITHUB_PATH"
+    - name: archyl ${{ inputs.command }}
+      if: inputs.command != ''
+      shell: bash
+      env:
+        ARCHYL_API_KEY: ${{ inputs.api-key }}
+        ARCHYL_PROJECT_ID: ${{ inputs.project-id }}
+        ARCHYL_HOST: ${{ inputs.host }}
+        GITHUB_TOKEN: ${{ github.token }}
+        ARCHYL_COMMAND: ${{ inputs.command }}
+      run: |
+        # Only review posts to the pull request; agents started by wrap or fix
+        # must not inherit a token they have no use for.
+        case "$ARCHYL_COMMAND" in
+          review*) ;;
+          *) unset GITHUB_TOKEN ;;
+        esac
+        # Word-split the command on purpose: it carries flags.
+        # shellcheck disable=SC2086
+        archyl $ARCHYL_COMMAND

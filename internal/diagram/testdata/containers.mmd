@@ -1,0 +1,19 @@
+flowchart TB
+  classDef container fill:#f0f9ff,stroke:#0284c7,color:#18181b
+  classDef external fill:#fafafa,stroke:#71717a,color:#3f3f46,stroke-dasharray:5 4
+  n1["<b>Storefront</b><br/>web app · React"]
+  n2["<b>Shop API</b><br/>api · Go"]
+  n3["<b>Fulfilment Worker</b><br/>worker · Go"]
+  n4[("<b>Orders DB</b><br/>database · PostgreSQL")]
+  n5["<b>Stripe</b><br/>software system"]
+  n6["<b>Warehouse</b><br/>software system"]
+  n7["<b>Mailgun</b><br/>software system"]
+  n1 -->|"places orders ×2"| n2
+  n2 -->|"reads from ×2"| n4
+  n2 -->|"charges cards"| n5
+  n3 -->|"reads from"| n4
+  n3 -->|"ships orders"| n6
+  n3 -->|"sends receipts"| n7
+  n6 -->|"updates stock"| n2
+  class n1,n2,n3,n4 container
+  class n5,n6,n7 external

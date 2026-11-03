@@ -1,0 +1,21 @@
+flowchart LR
+  classDef touched fill:#eef2ff,stroke:#4f46e5,stroke-width:3px,color:#18181b
+  classDef impacted fill:#f5f5ff,stroke:#818cf8,stroke-width:2px,color:#18181b
+  classDef distant fill:#fafafa,stroke:#a5b4fc,color:#52525b,stroke-dasharray:4 3
+  n1["<b>Payments #quot;Core#quot; API</b><br/>container"]
+  n2["<b>Ledger</b><br/>component"]
+  n3["<b>Checkout #lt;web#gt;</b><br/>container"]
+  n4["<b>Admin #124; Back-office</b><br/>container"]
+  n5["<b>Mobile App</b><br/>container"]
+  n6["<b>Nightly #35;batch</b><br/>component"]
+  n3 -->|"uses"| n1
+  n4 -->|"calls"| n1
+  n5 -->|"uses"| n3
+  n6 -.-> n1
+  n1 -->|"writes to"| n2
+  class n1,n2 touched
+  class n3,n4 impacted
+  class n5,n6 distant
+  linkStyle 0 stroke:#4f46e5,stroke-width:2px
+  linkStyle 1 stroke:#4f46e5,stroke-width:2px
+  linkStyle 4 stroke:#4f46e5,stroke-width:2px

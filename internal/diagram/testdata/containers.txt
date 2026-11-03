@@ -1,0 +1,29 @@
+
+                                        ┌─────────────────────┐
+                                        │ ▣ Fulfilment Worker │
+                                        │ worker · Go         │
+                                        └────┬─────┬─────┬────┘
+                                             │     │     │
+                                ┌────────────┘     │     └─────────┐
+                                │ ships orders     │               │
+                                ▼   sends receipts ▼               │
+ ┌─────────────────┐   ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐   ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐   │
+ │ ▣ Storefront    │   ╎ ◆ Warehouse     ╎   ╎ ◆ Mailgun       ╎   │
+ │ web app · React │   ╎ software system ╎   ╎ software system ╎   │
+ └────────┬────────┘   └╌╌╌╌╌╌╌╌┬╌╌╌╌╌╌╌╌┘   └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘   │
+          │                     │                                  │
+          └───────────────┐     │ updates stock           ┌────────┘
+         places orders ×2 │     │                         │
+                          ▼     ▼                         │
+                    ┌─────────────────┐                   │
+                    │ ▣ Shop API  4 ◉ │                   │
+                    │ api · Go        │                   │
+                    └─────┬─────┬─────┘                   │
+                          │     │                         │
+            charges cards │     └────────────┐       ┌────┘
+                          │    reads from ×2 │       │ reads from
+                          ▼                  ▼       ▼
+               ┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐   ┌───────────────────────┐
+               ╎ ◆ Stripe        ╎   │ ▣ Orders DB           │
+               ╎ software system ╎   │ database · PostgreSQL │
+               └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘   └───────────────────────┘

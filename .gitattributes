@@ -1,0 +1,2 @@
+# Windows checkouts keep LF so golden files and shell scripts match byte for byte.
+* text=auto eol=lf

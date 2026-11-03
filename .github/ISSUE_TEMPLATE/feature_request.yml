@@ -1,0 +1,21 @@
+name: Feature request
+description: A command, flag or behaviour you would like
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+      description: The command or flag you imagine, with an example of its output if you can.
+  - type: dropdown
+    id: who
+    attributes:
+      label: Who runs it
+      options: [A developer in a terminal, A coding agent, CI, Other]
