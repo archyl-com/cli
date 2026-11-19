@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -190,7 +191,7 @@ print it instead.`,
 
 func newDSLDiffCmd(app *App) *cobra.Command {
 	var file string
-	var exitCode bool
+	var exitCode, prune bool
 	cmd := &cobra.Command{
 		Use:   "diff",
 		Short: "Show what pushing archyl.yaml would change",
@@ -198,8 +199,10 @@ func newDSLDiffCmd(app *App) *cobra.Command {
 elements and relationships push would add (+) or change (~), grouped by C4
 level, and those only the model has (−), which push leaves in place.
 
+With --prune it marks, among those, what archyl dsl push --prune would delete.
 With --exit-code it exits 1 when there is any difference, for CI.`,
 		Example: `  archyl dsl diff
+  archyl dsl diff --prune
   archyl dsl diff --exit-code
   archyl dsl diff --json | jq '.changes[] | select(.action == "added")'`,
 		Args: cobra.NoArgs,
@@ -211,6 +214,7 @@ With --exit-code it exits 1 when there is any difference, for CI.`,
 			if err != nil {
 				return err
 			}
+			src.Prune = prune
 			diff, err := diffDSL(ctx, app, src)
 			if err != nil {
 				return err
@@ -231,8 +235,12 @@ With --exit-code it exits 1 when there is any difference, for CI.`,
 	}
 	addDSLFileFlag(cmd, &file)
 	cmd.Flags().BoolVar(&exitCode, "exit-code", false, "exit 1 when the file and the model differ")
+	cmd.Flags().BoolVar(&prune, "prune", false, "mark what dsl push --prune would delete")
 	return cmd
 }
+
+// errPruneUnsupported is returned when the server does not know how to prune.
+var errPruneUnsupported = errors.New("this Archyl server cannot prune yet; update it, or push without --prune")
 
 func diffDSL(ctx context.Context, app *App, src api.DSLSource) (*api.DSLDiff, error) {
 	project, err := app.Project(ctx)
@@ -251,39 +259,68 @@ func diffDSL(ctx context.Context, app *App, src api.DSLSource) (*api.DSLDiff, er
 	if api.IsStatus(err, http.StatusNotFound) {
 		return nil, fmt.Errorf("this Archyl server cannot preview a push yet: %w", err)
 	}
+	if err == nil && src.Prune && diff.Prune == nil {
+		return nil, errPruneUnsupported
+	}
 	return diff, err
 }
 
 func newDSLPushCmd(app *App) *cobra.Command {
 	var file string
-	var yes bool
+	var opts pushOptions
 	cmd := &cobra.Command{
 		Use:   "push",
 		Short: "Import archyl.yaml into the project",
 		Long: `Import archyl.yaml into the project: new elements and relationships are
 created, existing ones (matched by name) updated. Nothing is deleted.
 
+With --prune, what the project has and the file no longer declares is deleted
+too, kind by kind: systems, containers, components, code, relationships,
+decisions, docs and API contracts. A kind the file does not declare at all is
+left alone, so a file with no docs section never deletes a doc. Deleting an
+element deletes its children and its relationships. The server refuses a prune
+that would delete a large share of a kind, which is what a truncated file looks
+like; --force lets it through. archyl dsl diff --prune shows it without writing.
+
 In a terminal it shows the diff and asks first; --yes skips the question.`,
 		Example: `  archyl dsl push
-  archyl dsl push --yes --file docs/architecture/archyl.yaml`,
+  archyl dsl push --yes --file docs/architecture/archyl.yaml
+  archyl dsl push --prune --yes`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return pushDSL(cmd.Context(), app, dslPath(cmd.Context(), app, file), yes)
+			return pushDSL(cmd.Context(), app, dslPath(cmd.Context(), app, file), opts)
 		},
 	}
 	addDSLFileFlag(cmd, &file)
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "push without showing the diff and asking")
+	addPushFlags(cmd, &opts)
 	return cmd
+}
+
+// pushOptions are the flags of a push.
+type pushOptions struct {
+	yes   bool
+	prune bool
+	force bool
+}
+
+func addPushFlags(cmd *cobra.Command, opts *pushOptions) {
+	cmd.Flags().BoolVarP(&opts.yes, "yes", "y", false, "push without showing the diff and asking")
+	cmd.Flags().BoolVar(&opts.prune, "prune", false, "delete what the project has and the file no longer declares")
+	cmd.Flags().BoolVar(&opts.force, "force", false, "with --prune, delete even a large share of the project")
 }
 
 // pushDSL imports the file. In a terminal it previews the change and asks
 // first, unless yes is set; scripts and --json push straight away.
-func pushDSL(ctx context.Context, app *App, path string, yes bool) error {
+func pushDSL(ctx context.Context, app *App, path string, opts pushOptions) error {
 	p := app.Printer
+	if opts.force && !opts.prune {
+		return errors.New("--force only applies to --prune")
+	}
 	src, err := readDSL(ctx, app, path)
 	if err != nil {
 		return err
 	}
+	src.Prune, src.Force = opts.prune, opts.force
 	label := dslLabel(path, src)
 	project, err := app.Project(ctx)
 	if err != nil {
@@ -294,10 +331,11 @@ func pushDSL(ctx context.Context, app *App, path string, yes bool) error {
 		return err
 	}
 
-	if !yes && p.Interactive() {
+	if !opts.yes && p.Interactive() {
+		question := "Push " + label + " to the project?"
 		diff, err := diffDSL(ctx, app, src)
 		switch {
-		case api.IsStatus(err, http.StatusNotFound):
+		case api.IsStatus(err, http.StatusNotFound) && !opts.prune:
 			p.Eprintln(p.Bang() + " " + p.Muted("This server cannot preview the push; it will import the file as is."))
 		case err != nil:
 			return err
@@ -307,10 +345,18 @@ func pushDSL(ctx context.Context, app *App, path string, yes bool) error {
 		default:
 			renderDSLDiff(p, label, diff)
 			p.Println()
+			if diff.Prune != nil {
+				if len(diff.Prune.Refused) > 0 && !opts.force {
+					return pruneRefused(diff.Prune.Refused)
+				}
+				if deleted := len(diff.Prune.Entries); deleted > 0 {
+					question = "Push " + label + " and delete " + ui.Plural(deleted, "object", "objects") + "?"
+				}
+			}
 		}
 		push := false
 		if err := huh.NewConfirm().
-			Title("Push " + label + " to the project?").
+			Title(question).
 			Value(&push).Run(); err != nil {
 			return err
 		}
@@ -324,23 +370,63 @@ func pushDSL(ctx context.Context, app *App, path string, yes bool) error {
 		result, err = client.SyncDSL(ctx, project.ID, src)
 		return err
 	}); err != nil {
+		if api.IsStatus(err, http.StatusConflict) && opts.prune && !opts.force {
+			return fmt.Errorf("%w\nnothing was pushed; rerun with --force if the file is right", err)
+		}
 		return err
 	}
 	app.InvalidateModel(project.ID)
+	// A server that does not know the option imported the file and deleted
+	// nothing: say so rather than let the push pass for a prune.
+	unpruned := opts.prune && !result.PruneRan
 
 	if p.JSON {
-		return p.WriteJSON(result)
+		if err := p.WriteJSON(result); err != nil {
+			return err
+		}
+		if unpruned {
+			return errPruneUnsupported
+		}
+		return nil
 	}
 	created := dslCreated(p, result)
-	if len(created) == 0 {
-		p.Println(p.Check() + " Pushed " + p.Bold(label) + p.Muted(" — nothing new to create"))
-	} else {
-		p.Println(p.Check() + " Pushed " + p.Bold(label) + p.Muted(" · created ") + strings.Join(created, p.Muted(", ")))
+	summary := p.Muted(" — nothing new to create")
+	if len(created) > 0 {
+		summary = p.Muted(" · created ") + strings.Join(created, p.Muted(", "))
+	}
+	if deleted := len(result.Pruned); deleted > 0 {
+		summary += p.Muted(" · deleted ") + p.Bold(ui.Plural(deleted, "object", "objects"))
+	}
+	p.Println(p.Check() + " Pushed " + p.Bold(label) + summary)
+	for _, entry := range result.Pruned {
+		p.Println("  " + p.Danger("− ") + p.Muted(dslKind(entry.ElementType)+" ") + entry.ElementName)
 	}
 	for _, w := range result.Warnings {
 		p.Println("  " + p.Bang() + " " + p.Muted(w))
 	}
+	if unpruned {
+		return fmt.Errorf("the file was pushed, nothing was deleted: %w", errPruneUnsupported)
+	}
 	return nil
+}
+
+// pruneRefused is the error of a prune the server would refuse.
+func pruneRefused(reasons []string) error {
+	return fmt.Errorf(
+		"the prune would delete %s, which the server refuses: check the file, or rerun with --force",
+		strings.Join(reasons, ", "),
+	)
+}
+
+// dslKind names a kind of object the way a person reads it.
+func dslKind(kind string) string {
+	switch kind {
+	case "adr":
+		return "decision"
+	case "api_contract":
+		return "API contract"
+	}
+	return kind
 }
 
 // dslSection is one group of the diff, in C4 order.
@@ -384,6 +470,13 @@ func renderDSLDiff(p *ui.Printer, file string, diff *api.DSLDiff) {
 		}
 	}
 
+	pruned := map[string]bool{}
+	if diff.Prune != nil {
+		for _, entry := range diff.Prune.Entries {
+			pruned[entry.ElementType+"\x00"+entry.ElementName] = true
+		}
+	}
+
 	known := map[string]bool{}
 	sections := append([]dslSection(nil), dslSections...)
 	for _, s := range sections {
@@ -412,8 +505,11 @@ func renderDSLDiff(p *ui.Printer, file string, diff *api.DSLDiff) {
 				}
 				lines = append(lines, line)
 			case "removed":
-				line := "  " + p.Danger("− ") + dslName(p, s.level, name) + p.Muted("  only in Archyl, push keeps it")
-				lines = append(lines, line)
+				note := p.Muted("  only in Archyl, push keeps it")
+				if pruned[c.ElementType+"\x00"+name] {
+					note = p.Danger("  only in Archyl, push --prune deletes it")
+				}
+				lines = append(lines, "  "+p.Danger("− ")+dslName(p, s.level, name)+note)
 			case "modified":
 				if _, ok := printed[name]; !ok {
 					printed[name] = len(lines)
@@ -441,6 +537,9 @@ func renderDSLDiff(p *ui.Printer, file string, diff *api.DSLDiff) {
 	}
 	if only > 0 {
 		parts = append(parts, p.Muted(fmt.Sprintf("%d only in Archyl", only)))
+	}
+	if len(pruned) > 0 {
+		parts = append(parts, p.Danger(fmt.Sprintf("%d to delete with --prune", len(pruned))))
 	}
 	p.Println("  " + p.Bold(file) + p.Muted(" vs the model: ") + strings.Join(parts, p.Muted(" · ")))
 	printDSLWarnings(p, diff.Warnings)

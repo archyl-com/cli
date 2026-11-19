@@ -137,7 +137,7 @@ what is not right.
 | `archyl cr` | List, read, approve or request changes on Architecture Change Requests. |
 | `archyl hooks install` | A `pre-push` hook that blocks critical violations, and lets the push through when Archyl is unreachable. |
 | `archyl drift` | Model-to-code alignment score; `--compute --fail-under 80` as a quality gate. |
-| `archyl dsl pull` / `diff` / `push` | Architecture as code: write the model to `archyl.yaml`, see what pushing it would change by C4 level, push it. Push never deletes. `archyl sync` is `dsl push`. |
+| `archyl dsl pull` / `diff` / `push` | Architecture as code: write the model to `archyl.yaml`, see what pushing it would change by C4 level, push it. Push only deletes with `--prune`. `archyl sync` is `dsl push`. |
 | `archyl release` | Records a release, versioned from the CI tag. |
 
 ### Account and shell

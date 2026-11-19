@@ -27,6 +27,24 @@ type DSLDiff struct {
 	InSync   bool        `json:"inSync"`
 	Changes  []DSLChange `json:"changes"`
 	Warnings []string    `json:"warnings,omitempty"`
+	// Prune is what a pruning push would delete, when the diff was asked.
+	// A server that cannot prune leaves it out.
+	Prune *DSLPrunePreview `json:"prune,omitempty"`
+}
+
+// DSLPruned is one object a pruning push deletes: the model has it and the
+// file no longer declares it.
+type DSLPruned struct {
+	ElementType string `json:"elementType"`
+	ElementName string `json:"elementName"`
+}
+
+// DSLPrunePreview is what a pruning push would delete.
+type DSLPrunePreview struct {
+	Entries []DSLPruned `json:"entries"`
+	// Refused names each kind the server refuses to prune unless forced,
+	// because the push would delete a large share of it.
+	Refused []string `json:"refused,omitempty"`
 }
 
 // ExportDSL returns the project's model as archyl.yaml.
@@ -44,6 +62,11 @@ type DSLSource struct {
 	// resolve.
 	Path  string            `json:"path,omitempty"`
 	Files map[string]string `json:"files,omitempty"`
+	// Prune asks a push to delete what the model has and the file no longer
+	// declares, and a diff to report it. Force lets a push delete a large
+	// share of a kind.
+	Prune bool `json:"prune,omitempty"`
+	Force bool `json:"force,omitempty"`
 }
 
 // DiffDSL previews what importing a file would change, without writing.

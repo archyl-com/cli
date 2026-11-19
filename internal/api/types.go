@@ -323,6 +323,10 @@ type DSLImport struct {
 	EnvironmentsCreated  int      `json:"environmentsCreated"`
 	ReleasesCreated      int      `json:"releasesCreated"`
 	Warnings             []string `json:"warnings"`
+	// PruneRan is set by a server that pruned as asked; Pruned lists what it
+	// deleted.
+	PruneRan bool        `json:"pruneRan,omitempty"`
+	Pruned   []DSLPruned `json:"pruned,omitempty"`
 }
 
 // ReleaseRequest records a release.

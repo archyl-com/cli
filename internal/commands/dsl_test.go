@@ -31,6 +31,9 @@ type fakeArchyl struct {
 	jobPolls int
 	// oldServer makes the DSL schema predate included files.
 	oldServer bool
+	// imported is what a push answers; pruneRefused makes it refuse a prune.
+	imported     *api.DSLImport
+	pruneRefused bool
 }
 
 func (f *fakeArchyl) serve(t *testing.T) string {
@@ -59,7 +62,16 @@ func (f *fakeArchyl) serve(t *testing.T) string {
 		case strings.HasSuffix(path, "/dsl/diff"):
 			body = f.diff
 		case strings.HasSuffix(path, "/dsl/ingest"):
-			body = map[string]any{"import": api.DSLImport{ContainersCreated: 1}}
+			if f.pruneRefused {
+				w.WriteHeader(http.StatusConflict)
+				_, _ = io.WriteString(w, `{"error":"prune refused, it would delete 11 of 12 doc objects: check the file, or force the prune","code":"prune_refused"}`)
+				return
+			}
+			imported := api.DSLImport{ContainersCreated: 1}
+			if f.imported != nil {
+				imported = *f.imported
+			}
+			body = map[string]any{"import": imported}
 		case strings.HasSuffix(path, "/discovery") && r.Method == http.MethodPost:
 			if strings.Contains(string(raw), "acme/free") {
 				w.WriteHeader(http.StatusForbidden)
@@ -203,6 +215,98 @@ func TestDSLPushAndPull(
 			assert.False(t, f.called("POST /projects/p1/dsl/diff"), "no preview without a terminal")
 		})
 	}
+}
+
+func TestDSLPrune(
+	t *testing.T,
+) {
+	legacy := api.DSLPruned{ElementType: "container", ElementName: "Shop.Legacy"}
+	changes := []api.DSLChange{
+		{Action: "removed", ElementType: "container", ElementName: "Shop.Legacy"},
+		{Action: "removed", ElementType: "doc", ElementName: "Runbook"},
+	}
+	pruning := api.DSLDiff{Changes: changes, Prune: &api.DSLPrunePreview{Entries: []api.DSLPruned{legacy}}}
+
+	testCases := []struct {
+		name    string
+		fake    *fakeArchyl
+		args    []string
+		call    string
+		want    []string
+		wantErr string
+	}{
+		{
+			name: "diff marks what a prune deletes",
+			fake: &fakeArchyl{diff: pruning},
+			args: []string{"dsl", "diff", "--prune"},
+			call: "/projects/p1/dsl/diff",
+			want: []string{
+				"− ▣ Shop.Legacy  only in Archyl, push --prune deletes it",
+				"Runbook  only in Archyl, push keeps it",
+				"2 only in Archyl · 1 to delete with --prune",
+			},
+		},
+		{
+			name:    "diff says when the server cannot prune",
+			fake:    &fakeArchyl{diff: api.DSLDiff{Changes: changes}},
+			args:    []string{"dsl", "diff", "--prune"},
+			call:    "/projects/p1/dsl/diff",
+			wantErr: "cannot prune yet",
+		},
+		{
+			name: "push deletes and lists what it deleted",
+			fake: &fakeArchyl{imported: &api.DSLImport{PruneRan: true, Pruned: []api.DSLPruned{legacy}}},
+			args: []string{"dsl", "push", "--prune"},
+			call: "/projects/p1/dsl/ingest",
+			want: []string{"nothing new to create · deleted 1 object", "− container Shop.Legacy"},
+		},
+		{
+			name:    "push fails when the server ignored the prune",
+			fake:    &fakeArchyl{},
+			args:    []string{"sync", "--prune"},
+			call:    "/projects/p1/dsl/ingest",
+			wantErr: "nothing was deleted",
+		},
+		{
+			name:    "a refused prune points to --force",
+			fake:    &fakeArchyl{pruneRefused: true},
+			args:    []string{"dsl", "push", "--prune"},
+			call:    "/projects/p1/dsl/ingest",
+			wantErr: "rerun with --force",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			out, err := runArchyl(t, testCase.fake, testCase.args...)
+
+			if testCase.wantErr != "" {
+				require.ErrorContains(t, err, testCase.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+			for _, w := range testCase.want {
+				assert.Contains(t, out, w)
+			}
+			assert.Contains(t, testCase.fake.bodies[testCase.call], `"prune":true`)
+		})
+	}
+
+	t.Run("--force alone is refused before anything is sent", func(t *testing.T) {
+		f := &fakeArchyl{}
+		_, err := runArchyl(t, f, "dsl", "push", "--force")
+
+		require.ErrorContains(t, err, "--force only applies to --prune")
+		assert.False(t, f.called("POST /projects/p1/dsl/ingest"))
+	})
+
+	t.Run("a plain push does not ask for a prune", func(t *testing.T) {
+		f := &fakeArchyl{}
+		_, err := runArchyl(t, f, "dsl", "push")
+
+		require.NoError(t, err)
+		assert.NotContains(t, f.bodies["/projects/p1/dsl/ingest"], "prune")
+	})
 }
 
 func TestDSLPushSendsIncludedFiles(

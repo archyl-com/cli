@@ -8,26 +8,27 @@ import (
 )
 
 func newSyncCmd(app *App) *cobra.Command {
-	var yes bool
+	var opts pushOptions
 	cmd := &cobra.Command{
 		Use:   "sync [file]",
 		Short: "Push archyl.yaml to the project (same as dsl push)",
 		Long: `Import an architecture-as-code file (archyl.yaml by default, at the repository
 root) into the project. Same as archyl dsl push: new elements are created,
-existing ones updated, nothing deleted. In a terminal it shows the diff and
-asks first; --yes skips the question.`,
+existing ones updated, nothing deleted unless --prune is set. In a terminal it
+shows the diff and asks first; --yes skips the question.`,
 		Example: `  archyl sync
-  archyl sync docs/architecture/archyl.yaml --yes`,
+  archyl sync docs/architecture/archyl.yaml --yes
+  archyl sync --prune --yes`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			file := ""
 			if len(args) == 1 {
 				file = args[0]
 			}
-			return pushDSL(cmd.Context(), app, dslPath(cmd.Context(), app, file), yes)
+			return pushDSL(cmd.Context(), app, dslPath(cmd.Context(), app, file), opts)
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "push without showing the diff and asking")
+	addPushFlags(cmd, &opts)
 	return cmd
 }
 

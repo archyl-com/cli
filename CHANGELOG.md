@@ -6,6 +6,19 @@ All notable changes to `archyl` are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0]
+
+### Added
+
+- `dsl push --prune` and `sync --prune` delete what the project has and the
+  file no longer declares, for each kind of object the file declares. The
+  server refuses a prune that would delete a large share of a kind; `--force`
+  lets it through. `dsl diff --prune` marks what would be deleted. Needs an
+  Archyl server that knows the option: an older one makes the command fail
+  after the push, saying nothing was deleted.
+
+## [1.0.2]
+
 ### Fixed
 
 - `dsl push`, `dsl diff`, `dsl validate` and `sync` send the files that docs
