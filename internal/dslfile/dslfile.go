@@ -1,5 +1,6 @@
 // Package dslfile reads an archyl.yaml with the files its include
-// directives reach, the way the server merges them.
+// directives reach, the way the server merges them, and the files its docs
+// and API contracts take their body from.
 package dslfile
 
 import (
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -19,6 +21,8 @@ import (
 const (
 	// MaxFiles bounds how many files one root may include.
 	MaxFiles = 200
+	// MaxSentFiles bounds the included and referenced files together.
+	MaxSentFiles = 499
 	// MaxFileBytes caps one file.
 	MaxFileBytes = 5 << 20
 	// MaxTotalBytes caps the files together.
@@ -28,8 +32,9 @@ const (
 // ErrTooManyFiles is returned when the includes reach past MaxFiles.
 var ErrTooManyFiles = fmt.Errorf("more than %d included files", MaxFiles)
 
-// Source is a root file and the files it includes, keyed by their path
-// relative to the base directory, with forward slashes.
+// Source is a root file with the files it includes and the files its docs
+// and API contracts name, keyed by their path relative to the base directory,
+// with forward slashes.
 type Source struct {
 	Content string            `json:"content"`
 	Path    string            `json:"path,omitempty"`
@@ -40,6 +45,10 @@ type Source struct {
 // Includes resolve against the directory of the file declaring them and may
 // not leave base, usually the repository root. A file outside base is read
 // alone, its includes resolved against its own directory.
+//
+// A doc or API contract that names its body with `file:` has that file read
+// too, from base whichever file declares it: the server stores the text it is
+// sent and cannot read the checkout.
 func Load(base, file string) (*Source, error) {
 	rel, err := filepath.Rel(base, file)
 	inside := err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
@@ -98,6 +107,40 @@ func Load(base, file string) (*Source, error) {
 			queue = append(queue, resolved)
 		}
 	}
+
+	declared := make([]string, 0, len(contents))
+	for name := range contents {
+		declared = append(declared, name)
+	}
+	sort.Strings(declared)
+	for _, from := range declared {
+		for _, ref := range references(contents[from]) {
+			resolved, ok := resolve(".", ref)
+			if !ok {
+				return nil, fmt.Errorf("%s names the file %q, which is outside %s", from, ref, base)
+			}
+			if _, sent := src.Files[resolved]; sent || resolved == src.Path {
+				continue
+			}
+			if len(src.Files) >= MaxSentFiles {
+				return nil, fmt.Errorf("more than %d included and referenced files", MaxSentFiles)
+			}
+			body, err := readIncluded(filepath.Join(base, filepath.FromSlash(resolved)))
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, fmt.Errorf("%s names the file %s, which does not exist", from, resolved)
+			}
+			if err != nil {
+				return nil, fmt.Errorf("%s names the file %s: %w", from, resolved, err)
+			}
+			if total += len(body); total > MaxTotalBytes {
+				return nil, fmt.Errorf("the files are larger than %d MiB together", MaxTotalBytes>>20)
+			}
+			if src.Files == nil {
+				src.Files = map[string]string{}
+			}
+			src.Files[resolved] = string(body)
+		}
+	}
 	return src, nil
 }
 
@@ -133,6 +176,31 @@ func includes(content string) []string {
 		return nil
 	}
 	return head.Include
+}
+
+// references lists the files the docs and API contracts of a file take their
+// body from. A record with inline content needs none: the content wins.
+func references(content string) []string {
+	type record struct {
+		File    string `yaml:"file"`
+		Content string `yaml:"content"`
+	}
+	var head struct {
+		Docs struct {
+			Records []record `yaml:"records"`
+		} `yaml:"docs"`
+		APIContracts []record `yaml:"api_contracts"`
+	}
+	if err := yaml.Unmarshal([]byte(content), &head); err != nil {
+		return nil
+	}
+	var files []string
+	for _, r := range append(head.Docs.Records, head.APIContracts...) {
+		if strings.TrimSpace(r.File) != "" && r.Content == "" {
+			files = append(files, r.File)
+		}
+	}
+	return files
 }
 
 // resolve joins an include to the directory of the file declaring it. ok is

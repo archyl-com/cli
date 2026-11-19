@@ -73,6 +73,30 @@ func TestLoad(
 			wantErr: "outside",
 		},
 		{
+			name: "a doc and a contract body come from the files they name",
+			tree: map[string]string{
+				"services/archyl.yaml": "version: \"1.0\"\ninclude: [api.yaml]\ndocs:\n  records:\n    - title: Guide\n      file: ./docs/guide.md\n    - title: Inline\n      file: docs/unread.md\n      content: inline wins\n",
+				"services/api.yaml":    "api_contracts:\n  - name: Orders\n    file: api/orders.yaml\n",
+				"docs/guide.md":        "# Guide\n",
+				"api/orders.yaml":      "openapi: 3.1.0\n",
+			},
+			file:      "services/archyl.yaml",
+			wantPath:  "services/archyl.yaml",
+			wantFiles: []string{"services/api.yaml", "docs/guide.md", "api/orders.yaml"},
+		},
+		{
+			name:    "a doc naming a missing file",
+			tree:    map[string]string{"archyl.yaml": "docs:\n  records:\n    - title: Guide\n      file: docs/guide.md\n"},
+			file:    "archyl.yaml",
+			wantErr: "archyl.yaml names the file docs/guide.md, which does not exist",
+		},
+		{
+			name:    "a doc naming a file outside the repository",
+			tree:    map[string]string{"archyl.yaml": "docs:\n  records:\n    - title: Guide\n      file: ../../etc/passwd\n"},
+			file:    "archyl.yaml",
+			wantErr: "outside",
+		},
+		{
 			name:    "an empty file",
 			tree:    map[string]string{"archyl.yaml": "  \n"},
 			file:    "archyl.yaml",

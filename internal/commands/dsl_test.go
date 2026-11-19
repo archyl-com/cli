@@ -218,8 +218,8 @@ func TestDSLPushSendsIncludedFiles(
 		call string
 		want string
 	}{
-		{name: "push", args: []string{"dsl", "push"}, call: "/projects/p1/dsl/ingest", want: "Pushed archyl.yaml and 1 included file"},
-		{name: "diff", args: []string{"dsl", "diff"}, call: "/projects/p1/dsl/diff", want: "archyl.yaml and 1 included file"},
+		{name: "push", args: []string{"dsl", "push"}, call: "/projects/p1/dsl/ingest", want: "Pushed archyl.yaml and 1 other file"},
+		{name: "diff", args: []string{"dsl", "diff"}, call: "/projects/p1/dsl/diff", want: "archyl.yaml and 1 other file"},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {

@@ -92,15 +92,16 @@ func requireIncludes(ctx context.Context, app *App) error {
 	return nil
 }
 
-// dslLabel names what a push sends: the file, and how many it includes.
+// dslLabel names what a push sends: the file, and how many files go with it
+// (those it includes, and those its docs and API contracts name).
 func dslLabel(path string, src api.DSLSource) string {
 	label := filepath.Base(path)
 	switch n := len(src.Files); n {
 	case 0:
 	case 1:
-		label += " and 1 included file"
+		label += " and 1 other file"
 	default:
-		label += fmt.Sprintf(" and %d included files", n)
+		label += fmt.Sprintf(" and %d other files", n)
 	}
 	return label
 }
@@ -353,6 +354,9 @@ var dslSections = []dslSection{
 	{"component", "Components"},
 	{"code", "Code"},
 	{"relationship", "Relationships"},
+	{"adr", "Decisions"},
+	{"doc", "Docs"},
+	{"api_contract", "API contracts"},
 }
 
 // renderDSLDiff prints the diff grouped by C4 level: one line per element,

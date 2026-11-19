@@ -6,6 +6,16 @@ All notable changes to `archyl` are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `dsl push`, `dsl diff`, `dsl validate` and `sync` send the files that docs
+  and API contracts name with `file:`, read from the repository root. They
+  were never sent, so the server stored an empty body over the existing one
+  ([#8](https://github.com/archyl-com/cli/issues/8)). A file that does not
+  exist now stops the command. Needs an Archyl server from 2026-11-19 or later.
+- `dsl diff` lists decisions, docs and API contracts, so `--exit-code` no
+  longer passes while their text differs.
+
 ## [1.0.0]
 
 First public release.
